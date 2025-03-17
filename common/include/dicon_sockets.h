@@ -7,9 +7,12 @@
 #include <arpa/inet.h>
 
 
+enum DIC_ASYNC_RESULT{ RUNNING, SUCCESS, ERROR };
+
 typedef struct dic_connection{
     int sockfd;
 
+    pthread_mutex_t in_use;
     pthread_mutex_t recv_mut;
     pthread_mutex_t send_mut;
 
@@ -36,9 +39,15 @@ int dic_conn_tryconnect(dic_connection_t *conn);
 
 void dic_conn_destroy(dic_connection_t *conn);
 
-int dic_conn_send(dic_connection_t *conn, const char *message);
+// `SEND_STR` replaces `int len` in `dic_conn_send` for automatic string length detection.
+#define SEND_STR -1
+int dic_conn_send(dic_connection_t *conn, const char *message, int len);
 
 int dic_conn_recv(dic_connection_t *conn, char *buffer, int buffer_size);
 
+// yup, i'm bored so let's reinvent the wheel and make own async(?) sockets
 
+int dic_conn_send_async(dic_connection_t *conn, const char *message, int len, int *result);
+
+int dic_conn_recv_async(dic_connection_t *conn, char *buffer, int buffer_size, int *result);
 

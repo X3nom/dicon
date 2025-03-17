@@ -6,6 +6,11 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
+// locks mutex, executes code inside the "block", then unlocks
+#define MUTEX_BLOCK(mutex, code...) \
+    pthread_mutex_lock(mutex); \
+    code \
+    pthread_mutex_unlock(mutex)
 
 
 int tcp_connect(const char *ip, int port) {
@@ -61,6 +66,7 @@ dic_connection_t *dic_conn_new(char *ip, int port){
     strcpy(conn->ip, ip);
     conn->port = port;
 
+    pthread_mutex_init(&conn->in_use, NULL);
     pthread_mutex_init(&conn->send_mut, NULL);
     pthread_mutex_init(&conn->recv_mut, NULL);
 
@@ -72,16 +78,24 @@ void dic_conn_destroy(dic_connection_t *conn){
     free(conn);
 }
 
-int dic_conn_send(dic_connection_t *conn, const char *message){
+#define SEND_STR -1
+// Not thread-safe on its own
+int dic_conn_send(dic_connection_t *conn, const char *message, int len){
+    if(len == SEND_STR) len = strlen(message);
     int sockfd = conn->sockfd;
     // Send data to the server
-    send(sockfd, message, strlen(message), 0);
+    // MUTEX_BLOCK(&conn->send_mut,
+    send(sockfd, message, len, 0);
+    // );
 }
 
+// Not thread-safe on its own
 int dic_conn_recv(dic_connection_t *conn, char *buffer, int buffer_size){
     int sockfd = conn->sockfd;
     // Receive data from the server
+    // MUTEX_BLOCK(&conn->recv_mut,
     int bytes_received = recv(sockfd, buffer, buffer_size, 0);
+    // );
     if (bytes_received == -1) {
         perror("Receive failed");
         close(sockfd);
@@ -102,19 +116,63 @@ int dic_conn_tryconnect(dic_connection_t *conn){
     return 0;
 }
 
+// ASYNC (fun part) =======================================
+
+/*
+struct __dic_send_async_args{
+    dic_connection_t *conn; 
+    int *result;
+    int len;
+    char message[];
+};
+
+void *__dic_conn_send_async(struct __dic_send_async_args *args){
+}
+
+int dic_conn_send_async(dic_connection_t *conn, const char *message, int len, int *result){
+    if(conn->sockfd == -1) return 1;
+    if(len == SEND_STR) len = strlen(message);
+
+    struct __dic_send_async_args *args = (struct __dic_send_async_args *)malloc(sizeof(struct __dic_send_async_args)+len);
+
+    args->conn = conn;
+    args->result = result;
+    args->len = len;
+    memcpy(args->message, message, len); // create a temporary copy to avoid race conditions during send
+
+    pthread_t t_id;
+    pthread_create(&t_id, NULL, (void *(*)(void*))__dic_conn_send_async, args);
+    pthread_detach(t_id);
+}
 
 
 
-int main(){
+struct __dic_recv_async_args{
+
+};
+
+void *__dic_conn_recv_async(struct __dic_recv_async_args *args){
+
+}
+
+int dic_conn_recv_async(dic_connection_t *conn, char *buffer, int buffer_size, int *result){
+
+}
+
+*/
+
+/*
+int _demo(){
     dic_connection_t *conn = dic_conn_new("0.0.0.0", 1234);
 
-    dic_conn_send(conn, "hello world");
+    dic_conn_send(conn, "hello world", SEND_STR);
 
     dic_conn_disconnect(conn);
 
     dic_conn_tryconnect(conn);
 
-    dic_conn_send(conn, "hello again");
+    dic_conn_send(conn, "hello again", SEND_STR);
     
     dic_conn_destroy(conn);
 }
+*/

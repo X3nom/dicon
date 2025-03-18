@@ -4,12 +4,15 @@
 // Will not work with dynamic-size bodies
 #define REQ_SIZE(_body) (REQ_HEAD_SIZE+sizeof(_body))
 
+
 // (kinda) Evil macro
-#define REQ_BUILDER_INIT(_req_body) \
-    int msg_len = REQ_SIZE(_req_body); \
+#define REQ_BUILDER_INIT_DYNAMIC(_req_body, _dynamic_size) \
+    int msg_len = REQ_HEAD_SIZE + sizeof(_req_body) + _dynamic_size; \
     void *msg = malloc(msg_len); \
     dic_req_head_generic *head = msg; \
     _req_body *body = &msg[REQ_HEAD_SIZE];
+
+#define REQ_BUILDER_INIT(_req_body) REQ_BUILDER_INIT_DYNAMIC(_req_body, 0)
 
 #define REQ_BUILDER_SET_HEAD(_operation) \
     head->operation = _operation; \
@@ -31,6 +34,13 @@ typedef struct atomic_s_r_ret {
     char *body;
     int body_size;
 } atomic_s_r_ret;
+
+
+
+/*-----------------------------------------
+|            MEM HANDLING                 |
+-------------------------------------------*/
+
 
 /*==========================================
 |                GENERIC                   |
@@ -72,7 +82,7 @@ atomic_s_r_ret dic_atomic_send_recv(dic_node_t *device, msg_builder_ret msg){
 
 msg_builder_ret build_rmalloc_req(int size){
     REQ_BUILDER_INIT(dic_req_malloc);
-    REQ_BUILDER_SET_HEAD(MALLOC);
+    REQ_BUILDER_SET_HEAD(DIC_MALLOC);
 
     body->size = size; // size to malloc on the remote
 
@@ -103,7 +113,7 @@ dic_rvoid_ptr_t dic_rmalloc(dic_node_t *device, int size){
 
 msg_builder_ret build_rrealloc_req(dic_rvoid_ptr_t rvoid, int size){
     REQ_BUILDER_INIT(dic_req_realloc);
-    REQ_BUILDER_SET_HEAD(REALLOC);
+    REQ_BUILDER_SET_HEAD(DIC_REALLOC);
     
     body->void_ptr = rvoid.ptr;
     body->size = size;
@@ -134,7 +144,7 @@ dic_rvoid_ptr_t dic_rrealloc(dic_rvoid_ptr_t rvoid, int size){
 
 msg_builder_ret build_rfree_req(dic_rvoid_ptr_t rvoid){
     REQ_BUILDER_INIT(dic_req_free);
-    REQ_BUILDER_SET_HEAD(FREE);
+    REQ_BUILDER_SET_HEAD(DIC_FREE);
 
     body->void_ptr = rvoid.ptr;
 
@@ -166,14 +176,8 @@ int dic_rfree(dic_rvoid_ptr_t rvoid){
 // TODO: make it async
 
 msg_builder_ret build_memcpy_c2n_req(void *local, dic_rvoid_ptr_t remote, int size){
-    int msg_len = (sizeof(dic_req_head_generic) + sizeof(dic_req_memcpy_c2n) + size);
-    void *msg = malloc(msg_len);
-    dic_req_head_generic *head = msg;
-    dic_req_memcpy_c2n *body = &msg[sizeof(dic_req_head_generic)];
-    
-    REQ_BUILDER_SET_HEAD(MEMCPY_C2N);
-    // body size has to account for dynamic size nature of the memcpy reqs
-    head->body_size = sizeof(dic_req_memcpy_c2n) + size;
+    REQ_BUILDER_INIT_DYNAMIC(dic_req_memcpy_c2n, size);
+    REQ_BUILDER_SET_HEAD(DIC_MEMCPY_C2N);
 
     // set body
     body->data_size = size;
@@ -206,7 +210,7 @@ int dic_memcpy_c2n(void *local, dic_rvoid_ptr_t remote, int size){
 
 msg_builder_ret build_memcpy_n2c_req(void *local, dic_rvoid_ptr_t remote, int size){
     REQ_BUILDER_INIT(dic_req_memcpy_n2c);
-    REQ_BUILDER_SET_HEAD(MEMCPY_N2C);
+    REQ_BUILDER_SET_HEAD(DIC_MEMCPY_N2C);
 
     body->data_size = size;
     body->src = remote.ptr;
@@ -245,4 +249,146 @@ int dic_memcpy(void *local, dic_rvoid_ptr_t remote, int size, enum DIC_MEMCPY_MO
             return 1;
         }
     }
+}
+
+
+/*-----------------------------------------
+|            SO HANDLING                  |
+-------------------------------------------*/
+
+/*==========================================
+|               VERIFY                     |
+============================================*/
+// TODO
+
+/*==========================================
+|               SO_LOAD                    |
+============================================*/
+
+msg_builder_ret build_so_load(dic_node_t *device, const char *name){
+    int name_len = strlen(name) + 1;
+    REQ_BUILDER_INIT_DYNAMIC(dic_req_so_load, name_len);
+    REQ_BUILDER_SET_HEAD(DIC_SO_LOAD);
+
+    body->so_len = name_len;
+    strcpy(body->so_name, name);
+
+    return REQ_BUILDER_RET;
+}
+
+dic_rso_handle_t dic_so_load(dic_node_t *device, const char *name){
+    msg_builder_ret msg = build_so_load(device, name);
+
+    atomic_s_r_ret rcv = dic_atomic_send_recv(device, msg);
+
+    dic_resp_so_load *body = (dic_resp_so_load*)rcv.body;
+
+    dic_rso_handle_t handle;
+    handle.ptr = body->handle;
+    handle.device = device;
+
+    free(rcv.body);
+    free(msg.msg);
+
+    return handle;
+}
+
+
+/*==========================================
+|               SO_UNLOAD                  |
+============================================*/
+
+msg_builder_ret build_so_unload(dic_rso_handle_t handle){
+    REQ_BUILDER_INIT(dic_req_so_unload);
+    REQ_BUILDER_SET_HEAD(DIC_SO_UNLOAD);
+
+    body->handle = handle.ptr;
+
+    return REQ_BUILDER_RET;
+}
+
+int dic_so_unload(dic_rso_handle_t handle){
+    msg_builder_ret msg = build_so_unload(handle);
+
+    atomic_s_r_ret rcv = dic_atomic_send_recv(handle.device, msg);
+
+    dic_resp_so_unload *body = (dic_resp_so_unload*)rcv.body;
+
+    int succ = body->success;
+
+    free(rcv.body);
+    free(msg.msg);
+
+    return succ;
+}
+
+
+/*------------------------------------------
+|            FUNCTION HANDLING             |
+--------------------------------------------*/
+
+/*==========================================
+|                  RUN                     |
+============================================*/
+
+msg_builder_ret build_rthread_run(dic_rso_handle_t handle, const char *symbol, dic_rvoid_ptr_t args_ptr){
+    int sym_len = strlen(symbol); 
+    REQ_BUILDER_INIT_DYNAMIC(dic_req_run, sym_len);
+    REQ_BUILDER_SET_HEAD(DIC_RUN)
+
+    body->args_ptr = args_ptr.ptr;
+    body->so_handle = handle.ptr;
+    strcpy(body->symbol, symbol);
+    body->symlen = sym_len;
+
+    return REQ_BUILDER_RET;
+}
+
+dic_rthread_t dic_rthread_run(dic_rso_handle_t handle, const char *symbol, dic_rvoid_ptr_t args_ptr){
+    msg_builder_ret msg = build_rthread_run(handle, symbol, args_ptr);
+
+    atomic_s_r_ret rcv = dic_atomic_send_recv(handle.device, msg);
+
+    dic_resp_run *body = (dic_resp_run*)rcv.body;
+
+    dic_rthread_t rtid;
+    rtid.device = handle.device;
+    rtid.tid = body->tid;
+
+    free(rcv.body);
+    free(msg.msg);
+
+    return rtid;
+}
+
+
+/*==========================================
+|                  JOIN                    |
+============================================*/
+
+
+msg_builder_ret build_rthread_join(dic_rthread_t thread_id){
+    REQ_BUILDER_INIT(dic_req_join);
+    REQ_BUILDER_SET_HEAD(DIC_JOIN);
+
+    body->tid = thread_id.tid;
+
+    return REQ_BUILDER_RET;
+}
+
+dic_rvoid_ptr_t dic_rthread_join(dic_rthread_t thread_id){
+    msg_builder_ret msg = build_rthread_join(thread_id);
+
+    atomic_s_r_ret rcv = dic_atomic_send_recv(thread_id.device, msg);
+
+    dic_resp_join *body = (dic_resp_join*)rcv.body;
+
+    dic_rvoid_ptr_t ret_ptr;
+    ret_ptr.ptr = body->ret_ptr;
+    ret_ptr.device = thread_id.device;
+
+    free(rcv.body);
+    free(msg.msg);
+
+    return ret_ptr;
 }

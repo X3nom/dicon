@@ -26,22 +26,24 @@ typedef uint64_t universal_pthread_t;
 - ### Do not use for casting
 - `enum DIC_OPERATION` should not be used for casting or declarations, use type `DIC_OPERATION` instead for fixed size! */
 enum DIC_OPERATION {
-    MALLOC,
-    REALLOC,
-    FREE,
+    DIC_MALLOC,
+    DIC_REALLOC,
+    DIC_FREE,
     // memcpy CLIENT -> NODE
-    MEMCPY_C2N,
+    DIC_MEMCPY_C2N,
     // memcpy NODE -> CLIENT
-    MEMCPY_N2C,
+    DIC_MEMCPY_N2C,
     
-    VERIFY,
-    SO_LOAD,
-    SO_UNLOAD,
+    DIC_VERIFY,
+    DIC_SO_LOAD,
+    DIC_SO_UNLOAD,
 
-    RUN,
-    JOIN
+    DIC_RUN,
+    DIC_JOIN
 };
 
+
+#define ALIGNMENT __attribute__((__packed__))
 
 
 /*==========================================
@@ -49,7 +51,7 @@ enum DIC_OPERATION {
 ============================================*/
 
 // a base structure of header of all `client -> node` requests
-typedef struct dic_req_head_generic {
+typedef struct ALIGNMENT dic_req_head_generic {
     DIC_OPERATION operation;
     uint16_t version;
     uint32_t body_size; // size of the following data
@@ -58,7 +60,7 @@ typedef struct dic_req_head_generic {
 } dic_req_head_generic;
 
 // a base structure of header of all `node -> client` responses
-typedef struct dic_resp_head_generic {
+typedef struct ALIGNMENT dic_resp_head_generic {
     uint32_t body_size;
 
     uint8_t _body_placeholder[];
@@ -74,55 +76,55 @@ typedef struct dic_resp_head_generic {
 
 // MALLOC ==================================
 
-typedef struct dic_req_malloc {
+typedef struct ALIGNMENT dic_req_malloc {
     uint32_t size;
 } dic_req_malloc;
 
-typedef struct dic_resp_malloc {
+typedef struct ALIGNMENT dic_resp_malloc {
     universal_void_ptr mem_address;
 } dic_resp_malloc;
 
 // REALLOC ==================================
 
-typedef struct dic_req_realloc {
+typedef struct ALIGNMENT dic_req_realloc {
     universal_void_ptr void_ptr;
     uint32_t size;
 } dic_req_realloc;
 
-typedef struct dic_resp_realloc {
+typedef struct ALIGNMENT dic_resp_realloc {
     universal_void_ptr mem_address;
 } dic_resp_realloc;
 
 // FREE ==================================
 
-typedef struct dic_req_free {
+typedef struct ALIGNMENT dic_req_free {
     universal_void_ptr void_ptr;
 } dic_req_free;
 
-typedef struct dic_resp_free {
+typedef struct ALIGNMENT dic_resp_free {
     int8_t err;
 } dic_resp_free;
 
 // MEMCPY [client => node] ==================================
 
-typedef struct dic_req_memcpy_c2n {
+typedef struct ALIGNMENT dic_req_memcpy_c2n {
     universal_void_ptr dest;
     uint32_t data_size;
     uint8_t _data_placeholder[];
 } dic_req_memcpy_c2n;
 
-typedef struct dic_resp_memcpy_c2n {
+typedef struct ALIGNMENT dic_resp_memcpy_c2n {
     uint32_t err;
 } dic_resp_memcpy_c2n;
 
 // MEMCPY [node => client] ==================================
 
-typedef struct dic_req_memcpy_n2c {
+typedef struct ALIGNMENT dic_req_memcpy_n2c {
     universal_void_ptr src;
     uint32_t data_size;
 } dic_req_memcpy_n2c;
 
-typedef struct dic_resp_memcpy_n2c {
+typedef struct ALIGNMENT dic_resp_memcpy_n2c {
     uint32_t data_size;
     uint8_t _data_placeholder[];
 } dic_resp_memcpy_n2c;
@@ -136,36 +138,36 @@ typedef struct dic_resp_memcpy_n2c {
 
 // VERIFY ==================================
 
-struct dic_req_verify {
+typedef struct ALIGNMENT dic_req_verify {
     char hash[32];
     uint32_t so_len;
     char so_name[];
-};
+} dic_req_verify;
 
-struct dic_resp_verify {
+typedef struct ALIGNMENT dic_resp_verify {
     int32_t success;
-};
+} dic_resp_verify;
 
 // SO_LOAD ==================================
 
-struct dic_req_so_load {
+typedef struct ALIGNMENT dic_req_so_load {
     uint32_t so_len;
     char so_name[];
-};
+} dic_req_so_load;
 
-struct dic_resp_so_load {
+typedef struct ALIGNMENT dic_resp_so_load {
     universal_void_ptr handle;
-};
+} dic_resp_so_load;
 
 // SO_UNLOAD ==================================
 
-struct dic_req_so_unload {
+typedef struct ALIGNMENT dic_req_so_unload {
     universal_void_ptr handle;
-};
+} dic_req_so_unload;
 
-struct dic_resp_so_unload {
+typedef struct ALIGNMENT dic_resp_so_unload {
     int32_t success;
-};
+} dic_resp_so_unload;
 
 
 
@@ -175,24 +177,28 @@ struct dic_resp_so_unload {
 
 // RUN ==================================
 
-struct dic_req_run {
+typedef struct ALIGNMENT dic_req_run {
     universal_void_ptr so_handle;
     universal_void_ptr args_ptr;
     uint32_t symlen;
     // symbol (name) of the function to be called of length `symlen`
     char symbol[];
-};
+} dic_req_run;
 
-struct dic_resp_run {
+typedef struct ALIGNMENT dic_resp_run {
     universal_pthread_t tid;
-};
+} dic_resp_run;
 
 // JOIN ==================================
 
-struct dic_req_join {
+typedef struct ALIGNMENT dic_req_join {
     universal_pthread_t tid;
-};
+} dic_req_join;
 
-struct dic_resp_join {
+typedef struct ALIGNMENT dic_resp_join {
     universal_void_ptr ret_ptr;
-};
+} dic_resp_join;
+
+
+
+#undef ALIGNMENT

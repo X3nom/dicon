@@ -10,7 +10,7 @@
     int msg_len = REQ_HEAD_SIZE + sizeof(_req_body) + _dynamic_size; \
     void *msg = malloc(msg_len); \
     dic_req_head_generic *head = msg; \
-    _req_body *body = &msg[REQ_HEAD_SIZE];
+    _req_body *body = (void*)&((char*)msg)[REQ_HEAD_SIZE];
 
 #define REQ_BUILDER_INIT(_req_body) REQ_BUILDER_INIT_DYNAMIC(_req_body, 0)
 
@@ -30,10 +30,11 @@ typedef struct msg_builder_ret {
     int msg_len;
 } msg_builder_ret;
 
-typedef struct atomic_s_r_ret {
+
+typedef struct atomic_send_recv_ret {
     char *body;
     int body_size;
-} atomic_s_r_ret;
+} atomic_send_recv_ret;
 
 
 
@@ -48,7 +49,7 @@ typedef struct atomic_s_r_ret {
 
 
 // generic function for atomic send+recieve operation.
-atomic_s_r_ret dic_atomic_send_recv(dic_node_t *device, msg_builder_ret msg){
+atomic_send_recv_ret dic_atomic_send_recv(dic_node_t *device, msg_builder_ret msg){
     // wait until send is aviable
     pthread_mutex_lock(&device->send_mut);
 
@@ -61,16 +62,16 @@ atomic_s_r_ret dic_atomic_send_recv(dic_node_t *device, msg_builder_ret msg){
 
     // recv generic head
     dic_resp_head_generic head;
-    dic_conn_recv(device, (char*)&head, sizeof(head));
+    dic_conn_recv(device, (char*)&head, sizeof(head), 0);
 
     // recv rest of body (based on head info)
     char *body = (char*)malloc(head.body_size);
-    dic_conn_recv(device, body, head.body_size);
+    dic_conn_recv(device, body, head.body_size, 0);
 
     // all recv done, unlock
     pthread_mutex_unlock(&device->recv_mut);
 
-    return (atomic_s_r_ret){body, head.body_size};
+    return (atomic_send_recv_ret){body, head.body_size};
 }
 
 
@@ -93,7 +94,7 @@ dic_rvoid_ptr_t dic_rmalloc(dic_node_t *device, int size){
     // build request
     msg_builder_ret msg = build_rmalloc_req(size);
     // send request and get responses
-    atomic_s_r_ret rcv = dic_atomic_send_recv(device, msg);
+    atomic_send_recv_ret rcv = dic_atomic_send_recv(device, msg);
     // cast response to the right struct
     dic_resp_malloc *body = (dic_resp_malloc*)rcv.body;
     // extract the remote void pointer from response
@@ -124,7 +125,7 @@ msg_builder_ret build_rrealloc_req(dic_rvoid_ptr_t rvoid, int size){
 dic_rvoid_ptr_t dic_rrealloc(dic_rvoid_ptr_t rvoid, int size){
     msg_builder_ret msg = build_rrealloc_req(rvoid, size);
 
-    atomic_s_r_ret rcv = dic_atomic_send_recv(rvoid.device, msg);
+    atomic_send_recv_ret rcv = dic_atomic_send_recv(rvoid.device, msg);
 
     dic_resp_realloc *body = (dic_resp_realloc*)rcv.body;
 
@@ -154,7 +155,7 @@ msg_builder_ret build_rfree_req(dic_rvoid_ptr_t rvoid){
 int dic_rfree(dic_rvoid_ptr_t rvoid){
     msg_builder_ret msg = build_rfree_req(rvoid);
 
-    atomic_s_r_ret rcv = dic_atomic_send_recv(rvoid.device, msg);
+    atomic_send_recv_ret rcv = dic_atomic_send_recv(rvoid.device, msg);
 
     dic_resp_free *body = (dic_resp_free*)rcv.body;
 
@@ -191,7 +192,7 @@ msg_builder_ret build_memcpy_c2n_req(void *local, dic_rvoid_ptr_t remote, int si
 int dic_memcpy_c2n(void *local, dic_rvoid_ptr_t remote, int size){
     msg_builder_ret msg = build_memcpy_c2n_req(local, remote, size);
 
-    atomic_s_r_ret rcv = dic_atomic_send_recv(remote.device, msg);
+    atomic_send_recv_ret rcv = dic_atomic_send_recv(remote.device, msg);
 
     dic_resp_memcpy_c2n *body = (dic_resp_memcpy_c2n*)rcv.body;
 
@@ -221,7 +222,7 @@ msg_builder_ret build_memcpy_n2c_req(void *local, dic_rvoid_ptr_t remote, int si
 int dic_memcpy_n2c(void *local, dic_rvoid_ptr_t remote, int size){
     msg_builder_ret msg = build_memcpy_n2c_req(local, remote, size);
 
-    atomic_s_r_ret rcv = dic_atomic_send_recv(remote.device, msg);
+    atomic_send_recv_ret rcv = dic_atomic_send_recv(remote.device, msg);
 
     dic_resp_memcpy_n2c *body = (dic_resp_memcpy_n2c*)rcv.body;
 
@@ -279,7 +280,7 @@ msg_builder_ret build_so_load(dic_node_t *device, const char *name){
 dic_rso_handle_t dic_so_load(dic_node_t *device, const char *name){
     msg_builder_ret msg = build_so_load(device, name);
 
-    atomic_s_r_ret rcv = dic_atomic_send_recv(device, msg);
+    atomic_send_recv_ret rcv = dic_atomic_send_recv(device, msg);
 
     dic_resp_so_load *body = (dic_resp_so_load*)rcv.body;
 
@@ -310,7 +311,7 @@ msg_builder_ret build_so_unload(dic_rso_handle_t handle){
 int dic_so_unload(dic_rso_handle_t handle){
     msg_builder_ret msg = build_so_unload(handle);
 
-    atomic_s_r_ret rcv = dic_atomic_send_recv(handle.device, msg);
+    atomic_send_recv_ret rcv = dic_atomic_send_recv(handle.device, msg);
 
     dic_resp_so_unload *body = (dic_resp_so_unload*)rcv.body;
 
@@ -347,7 +348,7 @@ msg_builder_ret build_rthread_run(dic_rso_handle_t handle, const char *symbol, d
 dic_rthread_t dic_rthread_run(dic_rso_handle_t handle, const char *symbol, dic_rvoid_ptr_t args_ptr){
     msg_builder_ret msg = build_rthread_run(handle, symbol, args_ptr);
 
-    atomic_s_r_ret rcv = dic_atomic_send_recv(handle.device, msg);
+    atomic_send_recv_ret rcv = dic_atomic_send_recv(handle.device, msg);
 
     dic_resp_run *body = (dic_resp_run*)rcv.body;
 
@@ -379,7 +380,7 @@ msg_builder_ret build_rthread_join(dic_rthread_t thread_id){
 dic_rvoid_ptr_t dic_rthread_join(dic_rthread_t thread_id){
     msg_builder_ret msg = build_rthread_join(thread_id);
 
-    atomic_s_r_ret rcv = dic_atomic_send_recv(thread_id.device, msg);
+    atomic_send_recv_ret rcv = dic_atomic_send_recv(thread_id.device, msg);
 
     dic_resp_join *body = (dic_resp_join*)rcv.body;
 

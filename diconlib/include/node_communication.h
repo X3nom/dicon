@@ -10,7 +10,7 @@ All the operations should be thread safe. (underlaying tcp communication is not 
  * Points to memory address on a different (remote) device. */
 typedef struct {
     universal_void_ptr ptr; /* not valid address on the local, will likely cause segfault if accessed */
-    dic_connection_t *device;
+    dic_conn_t *device;
 } dic_rvoid_ptr_t;
 
 /* NOT COMPARABLE
@@ -23,7 +23,7 @@ Use `rvoid.ptr == NULL` or `IS_RNULL(rvoid)` instead of `rvoid == RNULL`*/
 
 typedef struct {
     universal_pthread_t tid;
-    dic_connection_t *device;
+    dic_conn_t *device;
 } dic_rthread_t;
 
 

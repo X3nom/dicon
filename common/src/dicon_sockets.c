@@ -13,7 +13,24 @@
     pthread_mutex_unlock(mutex)
 
 
-int tcp_connect(const char *ip, int port) {
+
+ip_addr_t ip_from_str(int family, const char *ip_str){
+    ip_addr_t ip;
+    ip.family = family;
+    inet_pton(family, ip_str, &ip.addr);
+    return ip;
+}
+ip_addr_t ipv4_from_str(const char *ip_str){
+    return ip_from_str(AF_INET, ip_str);
+}
+ip_addr_t ipv6_from_str(const char *ip_str){
+    return ip_from_str(AF_INET6, ip_str);
+}
+
+
+
+// takes ip in binary representation
+int tcp_connect(ip_addr_t ip, int port) {
     int sockfd;
     struct sockaddr_in server_addr;
 
@@ -29,11 +46,12 @@ int tcp_connect(const char *ip, int port) {
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(port);
-    if (inet_pton(AF_INET, ip, &server_addr.sin_addr) <= 0) {
+    if (ip.addr.ipv4 <= 0) {
         perror("Invalid address");
         close(sockfd);
         return -1;
     }
+    server_addr.sin_addr.s_addr = ip.addr.ipv4;
 
     // Connect to the server
     if (connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
@@ -46,9 +64,10 @@ int tcp_connect(const char *ip, int port) {
 }
 
 
-int dic_conn_disconnect(dic_connection_t *conn){
+int dic_conn_disconnect(dic_conn_t *conn){
     // Close the socket
     close(conn->sockfd);
+    conn->sockfd = -1;
     return 0;
 }
 
@@ -58,39 +77,40 @@ int dic_conn_disconnect(dic_connection_t *conn){
 /** returns malloced dic_connection_t
  * - socket may be -1 (connection failed)
  * - recommended to check for `conn->sockfd != -1` or `dic_conn_tryconnect(conn) == 0` */
-dic_connection_t *dic_conn_new(char *ip, int port){
+dic_conn_t *dic_conn_new(ip_addr_t ip, int port){
     int sockfd = tcp_connect(ip, port);
-    dic_connection_t *conn = (dic_connection_t*)malloc(sizeof(dic_connection_t));
+    dic_conn_t *conn = (dic_conn_t*)malloc(sizeof(dic_conn_t));
     
     conn->sockfd = sockfd;
-    strcpy(conn->ip, ip);
+    conn->ip = ip;
     conn->port = port;
 
-    pthread_mutex_init(&conn->in_use, NULL);
     pthread_mutex_init(&conn->send_mut, NULL);
     pthread_mutex_init(&conn->recv_mut, NULL);
 
     return conn;
 }
 
-void dic_conn_destroy(dic_connection_t *conn){
+void dic_conn_destroy(dic_conn_t *conn){
     dic_conn_disconnect(conn);
     free(conn);
 }
 
 #define SEND_STR -1
 // Not thread-safe on its own
-int dic_conn_send(dic_connection_t *conn, const char *message, int len){
+int dic_conn_send(dic_conn_t *conn, const char *message, int len){
     if(len == SEND_STR) len = strlen(message);
     int sockfd = conn->sockfd;
     // Send data to the server
     // MUTEX_BLOCK(&conn->send_mut,
     send(sockfd, message, len, 0);
     // );
+
+    return 0;
 }
 
 // Not thread-safe on its own
-int dic_conn_recv(dic_connection_t *conn, char *buffer, int buffer_size){
+int dic_conn_recv(dic_conn_t *conn, char *buffer, int buffer_size, bool null_terminate){
     int sockfd = conn->sockfd;
     // Receive data from the server
     // MUTEX_BLOCK(&conn->recv_mut,
@@ -102,13 +122,13 @@ int dic_conn_recv(dic_connection_t *conn, char *buffer, int buffer_size){
         conn->sockfd = -1; // set sockfd to closed/error state
         return 1;
     }
-    buffer[bytes_received] = '\0';  // Null-terminate the received data
-    printf("Received from server: %s\n", buffer);
+    if(null_terminate) buffer[bytes_received] = '\0';  // Null-terminate the received data
+    // printf("Received from server: %s\n", buffer);
     return 0;
 }
 
 
-int dic_conn_tryconnect(dic_connection_t *conn){
+int dic_conn_tryconnect(dic_conn_t *conn){
     if(conn->sockfd != -1) return 0;
     int sockfd = tcp_connect(conn->ip, conn->port);
     if(sockfd == -1) return 1;
@@ -116,63 +136,74 @@ int dic_conn_tryconnect(dic_connection_t *conn){
     return 0;
 }
 
-// ASYNC (fun part) =======================================
 
-/*
-struct __dic_send_async_args{
-    dic_connection_t *conn; 
-    int *result;
-    int len;
-    char message[];
-};
 
-void *__dic_conn_send_async(struct __dic_send_async_args *args){
+/* SERVER STUFF --------*/
+
+dic_listen_conn_t *dic_conn_new_listening(int port){
+    int server_fd;
+    struct sockaddr_in server_addr;
+    // socklen_t addr_size = sizeof(server_addr);
+
+    // Create socket
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd == -1) {
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Configure server address structure
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;  // Listen on all interfaces
+    server_addr.sin_port = port;
+
+    // Bind socket
+    if (bind(server_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
+        perror("Bind failed");
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    // Start listening
+    if (listen(server_fd, 8) == -1) {
+        perror("Listen failed");
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    dic_conn_t *conn = (dic_conn_t*)malloc(sizeof(dic_conn_t));
+    conn->port = port;
+    conn->sockfd = server_fd;
+    conn->ip = NONE_IP_ADDR;
+
+    pthread_mutex_init(&conn->recv_mut, NULL);
+    pthread_mutex_init(&conn->send_mut, NULL);
+
+    return conn;
 }
 
-int dic_conn_send_async(dic_connection_t *conn, const char *message, int len, int *result){
-    if(conn->sockfd == -1) return 1;
-    if(len == SEND_STR) len = strlen(message);
 
-    struct __dic_send_async_args *args = (struct __dic_send_async_args *)malloc(sizeof(struct __dic_send_async_args)+len);
-
-    args->conn = conn;
-    args->result = result;
-    args->len = len;
-    memcpy(args->message, message, len); // create a temporary copy to avoid race conditions during send
-
-    pthread_t t_id;
-    pthread_create(&t_id, NULL, (void *(*)(void*))__dic_conn_send_async, args);
-    pthread_detach(t_id);
-}
-
-
-
-struct __dic_recv_async_args{
-
-};
-
-void *__dic_conn_recv_async(struct __dic_recv_async_args *args){
-
-}
-
-int dic_conn_recv_async(dic_connection_t *conn, char *buffer, int buffer_size, int *result){
-
-}
-
-*/
-
-/*
-int _demo(){
-    dic_connection_t *conn = dic_conn_new("0.0.0.0", 1234);
-
-    dic_conn_send(conn, "hello world", SEND_STR);
-
-    dic_conn_disconnect(conn);
-
-    dic_conn_tryconnect(conn);
-
-    dic_conn_send(conn, "hello again", SEND_STR);
+dic_conn_t *dic_conn_accept(dic_listen_conn_t *listen_conn){
     
-    dic_conn_destroy(conn);
+    struct sockaddr_in client_addr;
+    socklen_t addr_size = sizeof(client_addr);
+
+    // Accept client connection
+    int client_fd = accept(listen_conn->sockfd, (struct sockaddr*)&client_addr, &addr_size);
+    if (client_fd == -1) {
+        perror("Accept failed");
+        // exit(EXIT_FAILURE);
+        return NULL;
+    }
+
+    dic_conn_t *conn = (dic_conn_t*)malloc(sizeof(dic_conn_t));
+
+    conn->sockfd = client_fd;
+    conn->port = client_addr.sin_port;
+    conn->ip.addr.ipv4 = client_addr.sin_addr.s_addr;
+
+    pthread_mutex_init(&conn->recv_mut, NULL);
+    pthread_mutex_init(&conn->send_mut, NULL);
+
+    return conn;   
 }
-*/

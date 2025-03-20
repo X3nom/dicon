@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "client_node_communication.h": "c",
+        "node_client_communication.h": "c"
     }
 }

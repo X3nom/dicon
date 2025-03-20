@@ -35,7 +35,7 @@ int tcp_connect(ip_addr_t ip, int port) {
     struct sockaddr_in server_addr;
 
     // Create client socket
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    sockfd = socket(ip.family, SOCK_STREAM, 0);
     if (sockfd == -1) {
         perror("Socket creation failed");
         return -1;
@@ -44,13 +44,14 @@ int tcp_connect(ip_addr_t ip, int port) {
 
     // Configure server address
     memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
+    server_addr.sin_family = ip.family;
     server_addr.sin_port = htons(port);
-    if (ip.addr.ipv4 <= 0) {
+    if(ip.family == AF_INET && ip.addr.ipv4 == 0) {
         perror("Invalid address");
         close(sockfd);
         return -1;
     }
+    // else if(ip.family == AF_INET6 && ip.addr.ipv6)
     server_addr.sin_addr.s_addr = ip.addr.ipv4;
 
     // Connect to the server
@@ -62,6 +63,24 @@ int tcp_connect(ip_addr_t ip, int port) {
 
     return sockfd;
 }
+
+// `recv` EXACTLY `n` bytes from tcp socket into buffer
+int tcp_recv_n(int sockfd, void *buffer, size_t n) {
+    size_t received = 0;
+    char *buf = (char *)buffer;
+    
+    while (received < n) {
+        ssize_t bytes = recv(sockfd, buf + received, n - received, 0);
+        
+        if (bytes <= 0) {
+            return -1;  // Error or connection closed
+        }
+        
+        received += bytes;
+    }
+    return 0;  // Success
+}
+
 
 
 int dic_conn_disconnect(dic_conn_t *conn){
@@ -109,20 +128,21 @@ int dic_conn_send(dic_conn_t *conn, const char *message, int len){
     return 0;
 }
 
-// Not thread-safe on its own
-int dic_conn_recv(dic_conn_t *conn, char *buffer, int buffer_size, bool null_terminate){
+/* Not thread-safe on its own
+Will read EXACTLY `n` bytes into buffer*/
+int dic_conn_recv(dic_conn_t *conn, char *buffer, int n, bool null_terminate){
     int sockfd = conn->sockfd;
     // Receive data from the server
     // MUTEX_BLOCK(&conn->recv_mut,
-    int bytes_received = recv(sockfd, buffer, buffer_size, 0);
+    int err = tcp_recv_n(sockfd, buffer, n);
     // );
-    if (bytes_received == -1) {
+    if (err == -1) {
         perror("Receive failed");
         close(sockfd);
         conn->sockfd = -1; // set sockfd to closed/error state
         return 1;
     }
-    if(null_terminate) buffer[bytes_received] = '\0';  // Null-terminate the received data
+    if(null_terminate) buffer[n] = '\0';  // Null-terminate the received data
     // printf("Received from server: %s\n", buffer);
     return 0;
 }

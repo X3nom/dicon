@@ -73,4 +73,14 @@ void dic_conn_destroy(dic_conn_t *conn);
 - if sending `\0` terminated string, use `SEND_STR` in place of `len`) */
 int dic_conn_send(dic_conn_t *conn, const char *message, int len);
 
-int dic_conn_recv(dic_conn_t *conn, char *buffer, int buffer_size, bool null_terminate);
+/* will recieve EXACTLY `n` bytes from `conn` into `buffer`
+*/
+int dic_conn_recv(dic_conn_t *conn, char *buffer, int n, bool null_terminate);
+
+
+
+// LISTENING (server)
+
+dic_listen_conn_t *dic_conn_new_listening(int port);
+
+dic_conn_t *dic_conn_accept(dic_listen_conn_t *listen_conn);

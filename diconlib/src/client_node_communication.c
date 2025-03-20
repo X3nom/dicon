@@ -1,4 +1,4 @@
-#include <node_communication.h>
+#include <client_node_communication.h>
 
 #define REQ_HEAD_SIZE sizeof(dic_req_head_generic)
 // Will not work with dynamic-size bodies

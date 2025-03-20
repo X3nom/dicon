@@ -18,6 +18,9 @@ typedef uint16_t DIC_OPERATION;
 
 // Should be casted from/to `void*`. (uin64_t for compatibility of different architectures)
 typedef uint64_t universal_void_ptr;
+// NULL value of `universal_void_ptr`
+#define UNULL ((universal_void_ptr)NULL)
+
 // Should be casted from/to `phtread_t` on the node (not on client for safety purposes)
 typedef uint64_t universal_pthread_t;
 

@@ -90,6 +90,7 @@ msg_builder_ret build_rmalloc_req(int size){
     return REQ_BUILDER_RET;
 }
 
+
 dic_rvoid_ptr_t dic_rmalloc(dic_node_t *device, int size){
     // build request
     msg_builder_ret msg = build_rmalloc_req(size);
@@ -107,6 +108,7 @@ dic_rvoid_ptr_t dic_rmalloc(dic_node_t *device, int size){
 
     return rptr;
 }
+
 
 /*==========================================
 |              RREALLOC                    |

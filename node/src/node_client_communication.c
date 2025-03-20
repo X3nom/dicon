@@ -16,6 +16,9 @@
 #define RESP_BUILD_RET (msg_builder_ret){msg, msg_len}
 
 
+
+
+
 msg_builder_ret handle_malloc(dic_req_malloc *req_body){
     RESP_BUILDER_INIT(dic_resp_malloc);
     RESP_SET_HEAD();
@@ -58,20 +61,49 @@ msg_builder_ret handle_free(dic_req_free *req_body){
 
 
 
+/*-------------------------------------------
+|       MEMCPY                              |
+-------------------------------------------*/
+
+// recieve data on address
+msg_builder_ret handle_memcpy_c2n(dic_req_memcpy_c2n *req_body){
+    RESP_BUILDER_INIT(dic_resp_memcpy_c2n);
+    RESP_SET_HEAD();
+
+    void *dest_ptr = (void*)req_body->dest;
+    //! POSSIBLE SEGFAULT - USER DIRECTLY MANIPULATES MEMORY
+    memcpy(dest_ptr, req_body->_data_placeholder, req_body->data_size);
+
+    resp_body->err = 0;
+
+    return RESP_BUILD_RET;
+}
+
+msg_builder_ret handle_memcpy_n2c(dic_req_memcpy_n2c *req_body){
+    RESP_BUILDER_INIT_DYNAMIC(dic_resp_memcpy_n2c, req_body->data_size);
+
+    resp_body->data_size = req_body->data_size;
+    //! POSSIBLE SEGFAULT - USER DIRECTLY MANIPULATES MEMORY
+    memcpy(resp_body->_data_placeholder, (void*)req_body->src, req_body->data_size);
+
+    return RESP_BUILD_RET;
+}
 
 
 
 
 
 
-void dic_recv_send(dic_conn_t *conn){
+int dic_node_recv_send(dic_conn_t *conn){
     dic_req_head_generic head;
 
-    dic_conn_recv(conn, (char*)&head, sizeof(head), 0);
+    int res = dic_conn_recv(conn, (char*)&head, sizeof(head), 0);
+    if(res==-1) return -1;
 
     void *body = malloc(head.body_size);
 
-    dic_conn_recv(conn, (char*)body, head.body_size, 0);
+    res = dic_conn_recv(conn, (char*)body, head.body_size, 0);
+    if(res==-1) return -1;
 
     msg_builder_ret msg;
     switch(head.operation){
@@ -87,6 +119,16 @@ void dic_recv_send(dic_conn_t *conn){
             msg = handle_free(body);
             break;
 
+        case DIC_MEMCPY_C2N:
+            msg = handle_memcpy_c2n(body);
+            break;
+
+        case DIC_MEMCPY_N2C:
+            msg = handle_memcpy_n2c(body);
+            break;
+
+        
+
         default: // shouldn't happen
             msg.msg = NULL;
             msg.msg_len = 0;
@@ -96,4 +138,6 @@ void dic_recv_send(dic_conn_t *conn){
 
     free(body);
     free(msg.msg);
+
+    return 0;
 }

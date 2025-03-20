@@ -175,7 +175,7 @@ dic_listen_conn_t *dic_conn_new_listening(int port){
     // Configure server address structure
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;  // Listen on all interfaces
-    server_addr.sin_port = port;
+    server_addr.sin_port = htons(port);
 
     // Bind socket
     if (bind(server_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {

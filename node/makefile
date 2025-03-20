@@ -38,5 +38,5 @@ normal: $(OBJ)
 	$(CC) $(CFLAGS) -o $(BIN_DIR)/$(EXEC_NAME) $(OBJ)
 
 clean:
-	rm -f ./lib/*
+	rm -f ./bin/*
 	rm -f ./obj/*

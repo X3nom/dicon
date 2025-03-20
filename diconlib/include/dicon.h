@@ -1,6 +1,6 @@
 #pragma once
 
-#include <node_communication.h>
+#include <client_node_communication.h>
 
 
 // Stringify parameter

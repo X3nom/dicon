@@ -2,6 +2,7 @@
     "files.associations": {
         "*.ipp": "cpp",
         "client_node_communication.h": "c",
-        "node_client_communication.h": "c"
+        "node_client_communication.h": "c",
+        "dicon.h": "c"
     }
 }

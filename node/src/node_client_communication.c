@@ -52,7 +52,7 @@ msg_builder_ret handle_free(dic_req_free *req_body){
     RESP_BUILDER_INIT(dic_resp_free);
     RESP_SET_HEAD();
 
-    void *ptr = (void*)req_body->void_ptr;
+    void *ptr = (void*)(req_body->void_ptr);
     
     free(ptr);
 
@@ -81,6 +81,7 @@ msg_builder_ret handle_memcpy_c2n(dic_req_memcpy_c2n *req_body){
 
 msg_builder_ret handle_memcpy_n2c(dic_req_memcpy_n2c *req_body){
     RESP_BUILDER_INIT_DYNAMIC(dic_resp_memcpy_n2c, req_body->data_size);
+    RESP_SET_HEAD();
 
     resp_body->data_size = req_body->data_size;
     //! POSSIBLE SEGFAULT - USER DIRECTLY MANIPULATES MEMORY

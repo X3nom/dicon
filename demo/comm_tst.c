@@ -19,7 +19,7 @@ int main(){
     dic_memcpy(test, rtest, sizeof(test), LOCAL_2_REMOTE);
     printf("memcpy local->remote done\n");
     // copy from remote buffer to test2
-    dic_memcpy(test2, rtest, 32, REMOTE_2_LOCAL);
+    dic_memcpy(test2, rtest, 30, REMOTE_2_LOCAL);
     printf("memcpy remote->local done\n");
 
     // if everything works, test2 should contain content of test

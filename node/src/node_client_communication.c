@@ -53,7 +53,7 @@ msg_builder_ret handle_free(dic_req_free *req_body){
     RESP_SET_HEAD();
 
     void *ptr = (void*)(req_body->void_ptr);
-    
+
     free(ptr);
 
     return RESP_BUILD_RET;
@@ -99,12 +99,12 @@ int dic_node_recv_send(dic_conn_t *conn){
     dic_req_head_generic head;
 
     int res = dic_conn_recv(conn, (char*)&head, sizeof(head), 0);
-    if(res==-1) return -1;
+    if(res!=0) return res;
 
     void *body = malloc(head.body_size);
 
     res = dic_conn_recv(conn, (char*)body, head.body_size, 0);
-    if(res==-1) return -1;
+    if(res!=0) return res;
 
     msg_builder_ret msg;
     switch(head.operation){
@@ -133,9 +133,11 @@ int dic_node_recv_send(dic_conn_t *conn){
         default: // shouldn't happen
             msg.msg = NULL;
             msg.msg_len = 0;
+            break;
     }
 
-    dic_conn_send(conn, msg.msg, msg.msg_len);
+    if(msg.msg != NULL)
+        dic_conn_send(conn, msg.msg, msg.msg_len);
 
     free(body);
     free(msg.msg);

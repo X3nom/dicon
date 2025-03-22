@@ -26,6 +26,9 @@ int main(){
     printf("%s\n", test2);
 
     // cleanup
+
+    printf("freeing ptr: %ld\n", rtest.ptr);
+
     dic_rfree(rtest);
     dic_conn_destroy(conn);
 

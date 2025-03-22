@@ -27,6 +27,8 @@ int listen_loop(dic_listen_conn_t *listen_conn){
 
         res = client_handling_loop(client_conn);
 
+        LOG("CLIENT DISCONNECTED\n");
+
         dic_conn_destroy(client_conn); // free the conn
     }
     

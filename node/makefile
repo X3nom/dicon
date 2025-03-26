@@ -30,12 +30,16 @@ $(OBJ_DIR)/%.o: ../common/src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 
-# OPTIONS
+# TARGETS =================
 
-all: normal
+# make normal default target
+.DEFAULT_GOAL := normal
 
 normal: $(OBJ)
 	$(CC) $(CFLAGS) -o $(BIN_DIR)/$(EXEC_NAME) $(OBJ)
+
+debug: $(OBJ)
+	$(CC) $(CFLAGS) -g -o $(BIN_DIR)/$(EXEC_NAME) $(OBJ)
 
 clean:
 	rm -f ./bin/*

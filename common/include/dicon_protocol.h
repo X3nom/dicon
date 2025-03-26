@@ -41,6 +41,8 @@ enum DIC_OPERATION {
     DIC_SO_LOAD,
     DIC_SO_UNLOAD,
 
+    DIC_FUNC_LOAD,
+
     DIC_RUN,
     DIC_JOIN
 };
@@ -178,19 +180,33 @@ typedef struct ALIGNMENT dic_resp_so_unload {
 |            FUNCTION HANDLING             |
 ============================================*/
 
-// RUN ==================================
 
-typedef struct ALIGNMENT dic_req_run {
+// LOAD =================================
+
+typedef struct ALIGNMENT dic_req_func_load {
     universal_void_ptr so_handle;
-    universal_void_ptr args_ptr;
     uint32_t symlen;
     // symbol (name) of the function to be called of length `symlen`
     char symbol[];
+} dic_req_func_load;
+
+typedef struct ALIGNMENT dic_resp_func_load {
+    universal_void_ptr func_ptr;
+} dic_resp_func_load;
+
+
+
+// RUN ==================================
+
+typedef struct ALIGNMENT dic_req_run {
+    universal_void_ptr func_ptr;
+    universal_void_ptr args_ptr;
 } dic_req_run;
 
 typedef struct ALIGNMENT dic_resp_run {
     universal_pthread_t tid;
 } dic_resp_run;
+
 
 // JOIN ==================================
 

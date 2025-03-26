@@ -5,8 +5,8 @@
 
 int main(){
     ip_addr_t ip = ipv4_from_str("127.0.0.1");
-    printf("got ip\n");
     dic_conn_t *conn = dic_conn_new(ip, 12345);
+    while(dic_conn_tryconnect(conn)){};
     printf("conn established\n");
 
     char test[] = "hello world";
@@ -26,9 +26,6 @@ int main(){
     printf("%s\n", test2);
 
     // cleanup
-
-    printf("freeing ptr: %ld\n", rtest.ptr);
-
     dic_rfree(rtest);
     dic_conn_destroy(conn);
 

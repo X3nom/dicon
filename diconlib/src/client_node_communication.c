@@ -331,15 +331,14 @@ int dic_so_unload(dic_rso_handle_t handle){
 --------------------------------------------*/
 
 /*==========================================
-|                  RUN                     |
+|               FUNC LOAD                   |
 ============================================*/
 
-msg_builder_ret build_rthread_run(dic_rso_handle_t handle, const char *symbol, dic_rvoid_ptr_t args_ptr){
+msg_builder_ret build_func_load(dic_rso_handle_t handle, const char *symbol){
     int sym_len = strlen(symbol); 
-    REQ_BUILDER_INIT_DYNAMIC(dic_req_run, sym_len);
-    REQ_BUILDER_SET_HEAD(DIC_RUN)
+    REQ_BUILDER_INIT_DYNAMIC(dic_req_func_load, sym_len);
+    REQ_BUILDER_SET_HEAD(DIC_FUNC_LOAD);
 
-    body->args_ptr = args_ptr.ptr;
     body->so_handle = handle.ptr;
     strcpy(body->symbol, symbol);
     body->symlen = sym_len;
@@ -347,15 +346,47 @@ msg_builder_ret build_rthread_run(dic_rso_handle_t handle, const char *symbol, d
     return REQ_BUILDER_RET;
 }
 
-dic_rthread_t dic_rthread_run(dic_rso_handle_t handle, const char *symbol, dic_rvoid_ptr_t args_ptr){
-    msg_builder_ret msg = build_rthread_run(handle, symbol, args_ptr);
+dic_rfunc_ptr_t dic_func_load(dic_rso_handle_t so_handle, const char *symbol){
+    msg_builder_ret msg = build_func_load(so_handle, symbol);
 
-    atomic_send_recv_ret rcv = dic_atomic_send_recv(handle.device, msg);
+    atomic_send_recv_ret rcv = dic_atomic_send_recv(so_handle.device, msg);
+
+    dic_resp_func_load *body = (dic_resp_func_load*)rcv.body;
+
+    dic_rfunc_ptr_t func_ptr;
+    func_ptr.ptr = body->func_ptr;
+    func_ptr.device = so_handle.device;
+
+    free(rcv.body);
+    free(msg.msg);
+
+    return func_ptr;
+}
+
+
+/*==========================================
+|                  RUN                     |
+============================================*/
+
+msg_builder_ret build_rthread_run(dic_rfunc_ptr_t func_ptr, dic_rvoid_ptr_t args_ptr){
+    REQ_BUILDER_INIT(dic_req_run);
+    REQ_BUILDER_SET_HEAD(DIC_RUN)
+
+    body->func_ptr = func_ptr.ptr;
+    body->args_ptr = args_ptr.ptr;
+
+    return REQ_BUILDER_RET;
+}
+
+dic_rthread_t dic_rthread_run(dic_rso_handle_t func_ptr, dic_rvoid_ptr_t args_ptr){
+    msg_builder_ret msg = build_rthread_run(func_ptr, args_ptr);
+
+    atomic_send_recv_ret rcv = dic_atomic_send_recv(func_ptr.device, msg);
 
     dic_resp_run *body = (dic_resp_run*)rcv.body;
 
     dic_rthread_t rtid;
-    rtid.device = handle.device;
+    rtid.device = func_ptr.device;
     rtid.tid = body->tid;
 
     free(rcv.body);

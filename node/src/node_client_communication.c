@@ -1,4 +1,6 @@
 #include "../include/node_client_communication.h"
+#include <global_logging.h>
+#include <dlfcn.h>
 
 #define RESP_HEAD_SIZE sizeof(dic_resp_head_generic)
 
@@ -14,7 +16,6 @@
     resp_head->body_size = msg_len - RESP_HEAD_SIZE;
 
 #define RESP_BUILD_RET (msg_builder_ret){msg, msg_len}
-
 
 
 
@@ -55,6 +56,7 @@ msg_builder_ret handle_free(dic_req_free *req_body){
     void *ptr = (void*)(req_body->void_ptr);
 
     free(ptr);
+    resp_body->err = 0;
 
     return RESP_BUILD_RET;
 }
@@ -91,6 +93,89 @@ msg_builder_ret handle_memcpy_n2c(dic_req_memcpy_n2c *req_body){
 }
 
 
+/*==========================================
+|             SO                           |
+==========================================*/
+
+msg_builder_ret handle_so_load(dic_req_so_load *req_body){
+    RESP_BUILDER_INIT(dic_resp_so_load);
+    RESP_SET_HEAD();
+
+    // path formatting
+    char so_path_prefix[] = "user_objects/";
+    char *so_path = malloc(sizeof(so_path_prefix) + req_body->so_len);
+    sprintf(so_path, "%s%s.so", so_path_prefix, req_body->so_name);
+    // ------
+
+
+    void *handle = dlopen(so_path, RTLD_LAZY);
+
+    free(so_path);
+
+    resp_body->handle = (universal_void_ptr)handle;
+
+    return RESP_BUILD_RET;
+}
+
+msg_builder_ret handle_so_unload(dic_req_so_unload *req_body){
+    RESP_BUILDER_INIT(dic_resp_so_unload);
+    RESP_SET_HEAD();
+
+    dlclose((void*)req_body->handle);
+
+    resp_body->success = 0;
+    
+    return RESP_BUILD_RET;
+}
+
+
+msg_builder_ret handle_func_load(dic_req_func_load *req_body){
+    RESP_BUILDER_INIT(dic_resp_func_load);
+    RESP_SET_HEAD();
+
+    void *func = dlsym((void*)req_body->so_handle, req_body->symbol);
+
+    resp_body->func_ptr = (universal_void_ptr)func;
+
+    return RESP_BUILD_RET;
+}
+
+/*========================================
+|         RTHREAD                        |
+========================================*/
+
+msg_builder_ret handle_run(dic_req_run *req_body){
+    RESP_BUILDER_INIT(dic_resp_run);
+    RESP_SET_HEAD();
+
+    void *(*func)(void*) = (void*)req_body->func_ptr;
+
+    // spawn the requested thread
+    pthread_t t_id;
+    pthread_create(&t_id, NULL, func, (void*)req_body->args_ptr);
+
+    resp_body->tid = t_id;
+
+    return RESP_BUILD_RET;
+}
+
+
+msg_builder_ret handle_join(dic_req_join *req_body){
+    RESP_BUILDER_INIT(dic_resp_join);
+    RESP_SET_HEAD();
+
+    pthread_t t_id = req_body->tid;
+    void *ret_ptr;
+    pthread_join(t_id, &ret_ptr);
+
+    resp_body->ret_ptr = (universal_void_ptr)ret_ptr;
+
+    return RESP_BUILD_RET;
+}
+
+
+
+
 
 
 
@@ -106,35 +191,34 @@ int dic_node_recv_send(dic_conn_t *conn){
     res = dic_conn_recv(conn, (char*)body, head.body_size, 0);
     if(res!=0) return res;
 
+    LOG(2, "recieved request from client [operation: %d]\n", head.operation);
+
     msg_builder_ret msg;
+    // case shorthand
+    #define ccase(_cond, _func) case _cond: msg = _func(body); break;
     switch(head.operation){
-        case DIC_MALLOC:
-            msg = handle_malloc(body);
-            break;
+        ccase(DIC_MALLOC, handle_malloc);
+        ccase(DIC_REALLOC, handle_realloc);
+        ccase(DIC_FREE, handle_free);
 
-        case DIC_REALLOC:
-            msg = handle_realloc(body);
-            break;
+        ccase(DIC_MEMCPY_C2N, handle_memcpy_c2n);
+        ccase(DIC_MEMCPY_N2C, handle_memcpy_n2c);
 
-        case DIC_FREE:
-            msg = handle_free(body);
-            break;
+        ccase(DIC_SO_LOAD, handle_so_load);
+        ccase(DIC_SO_UNLOAD, handle_so_unload);
 
-        case DIC_MEMCPY_C2N:
-            msg = handle_memcpy_c2n(body);
-            break;
+        ccase(DIC_FUNC_LOAD, handle_func_load);
 
-        case DIC_MEMCPY_N2C:
-            msg = handle_memcpy_n2c(body);
-            break;
-
-        
+        ccase(DIC_RUN, handle_run);
+        ccase(DIC_JOIN, handle_join);
 
         default: // shouldn't happen
             msg.msg = NULL;
             msg.msg_len = 0;
             break;
     }
+    #undef ccase // undef the temporary shorthand
+
 
     if(msg.msg != NULL)
         dic_conn_send(conn, msg.msg, msg.msg_len);

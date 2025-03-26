@@ -61,10 +61,13 @@ int dic_so_unload(dic_rso_handle_t handle);
 |            FUNCTION HANDLING             |
 ============================================*/
 
-/* Load function from `handle` and run it with `args_ptr`
+typedef dic_rvoid_ptr_t dic_rfunc_ptr_t;
 
+dic_rfunc_ptr_t dic_func_load(dic_rso_handle_t so_handle, const char *symbol);
+
+/* Load function from `handle` and run it with `args_ptr`
 */
-dic_rthread_t dic_rthread_run(dic_rso_handle_t handle, const char *symbol, dic_rvoid_ptr_t args_ptr);
+dic_rthread_t dic_rthread_run(dic_rfunc_ptr_t func_ptr, dic_rvoid_ptr_t args_ptr);
 
 
 dic_rvoid_ptr_t dic_rthread_join(dic_rthread_t thread_id);

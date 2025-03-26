@@ -3,6 +3,13 @@
         "*.ipp": "cpp",
         "client_node_communication.h": "c",
         "node_client_communication.h": "c",
-        "dicon.h": "c"
+        "dicon.h": "c",
+        "bitset": "c",
+        "set": "c",
+        "format": "c",
+        "__tree": "c",
+        "random": "c",
+        "global_logging.h": "c",
+        "math.h": "c"
     }
 }

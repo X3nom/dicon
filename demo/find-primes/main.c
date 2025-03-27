@@ -75,7 +75,7 @@ dic_conn_t **init_connections(ip_addr_t *ips, int count, int port){
 int main() {
     // SETUP ===========================================================
     int port = 12345;
-    ip_addr_t ips[] = {IPV4("127.0.0.0"), IPV4("172.17.17.102")};
+    ip_addr_t ips[] = {IPV4("127.0.0.0"), IPV4("")};
 
     int NODE_COUNT = sizeof(ips) / sizeof(ip_addr_t);
 

@@ -154,7 +154,7 @@ msg_builder_ret handle_run(dic_req_run *req_body){
     pthread_t t_id;
     pthread_create(&t_id, NULL, func, (void*)req_body->args_ptr);
 
-    resp_body->tid = t_id;
+    resp_body->tid = (universal_pthread_t)t_id;
 
     return RESP_BUILD_RET;
 }
@@ -164,7 +164,7 @@ msg_builder_ret handle_join(dic_req_join *req_body){
     RESP_BUILDER_INIT(dic_resp_join);
     RESP_SET_HEAD();
 
-    pthread_t t_id = req_body->tid;
+    pthread_t t_id = (pthread_t)req_body->tid;
     void *ret_ptr;
     pthread_join(t_id, &ret_ptr);
 

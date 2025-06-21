@@ -11,6 +11,7 @@
 #pragma once
 #include <inttypes.h>
 
+#define DIC_NODE_PORT 4224
 
 // use for casting and declarations, ensures fixed 16bit size in header
 typedef uint16_t DIC_OPERATION;
@@ -40,6 +41,7 @@ enum DIC_OPERATION {
     DIC_VERIFY,
     DIC_SO_LOAD,
     DIC_SO_UNLOAD,
+    DIC_SO_UPLOAD,
 
     DIC_FUNC_LOAD,
 
@@ -144,13 +146,11 @@ typedef struct ALIGNMENT dic_resp_memcpy_n2c {
 // VERIFY ==================================
 
 typedef struct ALIGNMENT dic_req_verify {
-    char hash[32];
-    uint32_t so_len;
-    char so_name[];
+    uint8_t hash[64]; // bcrypt hash of password
 } dic_req_verify;
 
 typedef struct ALIGNMENT dic_resp_verify {
-    int32_t success;
+    int32_t success; // if unsuccessfull, connection should be dropped
 } dic_resp_verify;
 
 // SO_LOAD ==================================
@@ -173,6 +173,22 @@ typedef struct ALIGNMENT dic_req_so_unload {
 typedef struct ALIGNMENT dic_resp_so_unload {
     int32_t success;
 } dic_resp_so_unload;
+
+// SO_UPLOAD ==================================
+
+typedef struct ALIGNMENT dic_req_so_upload {
+    uint64_t file_size;
+
+    // len excluding \0
+    uint32_t name_len;
+
+    // name + \0 + file bytes, can be direcly fed into string functions for getting name
+    uint8_t _name_null_file[];
+} dic_req_so_upload;
+
+typedef struct ALIGNMENT dic_resp_so_upload {
+    int32_t success;
+} dic_resp_so_upload;
 
 
 

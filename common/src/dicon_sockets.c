@@ -103,7 +103,10 @@ dic_conn_t *dic_conn_new(ip_addr_t ip, int port){
     conn->sockfd = sockfd;
     conn->ip = ip;
     conn->port = port;
+    conn->queue_len = 0;
 
+    pthread_cond_init(&conn->queue_cond, NULL);
+    pthread_mutex_init(&conn->queue_mut, NULL);
     pthread_mutex_init(&conn->send_mut, NULL);
     pthread_mutex_init(&conn->recv_mut, NULL);
 
@@ -112,6 +115,10 @@ dic_conn_t *dic_conn_new(ip_addr_t ip, int port){
 
 void dic_conn_destroy(dic_conn_t *conn){
     dic_conn_disconnect(conn);
+    pthread_cond_destroy(&conn->queue_cond);
+    pthread_mutex_destroy(&conn->queue_mut);
+    pthread_mutex_destroy(&conn->send_mut);
+    pthread_mutex_destroy(&conn->recv_mut);
     free(conn);
 }
 

@@ -1,0 +1,15 @@
+FROM debian:stable-slim
+
+# Set working directory
+RUN mkdir /app
+RUN mkdir /app/node
+WORKDIR /app/node
+
+# Copy source code
+COPY ./node/bin /app/node/bin
+
+EXPOSE 4224
+
+
+ENTRYPOINT [ "/app/node/bin/main" ]
+CMD [ "-V 5" ]

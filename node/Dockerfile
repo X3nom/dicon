@@ -1,20 +1,25 @@
-FROM debian:latest
+FROM debian:stable-slim
 
-# set workdir (needed for relative path to user_objects)
-WORKDIR /app
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-# create dirs
-RUN mkdir -p /app/bin
-RUN mkdir -p /app/user_objects
+# Set working directory
+RUN mkdir /app
+RUN mkdir /app/node
+WORKDIR /app/node
 
-# copy bin
-COPY ./bin /app/bin
+# Copy source code
+COPY ./node .
+COPY ./common ../common
 
-# REMOVE ====
-COPY ./user_objects /app/user_objects
-#============
+# Build the server
+RUN make
+# RUN make && ls -lR /app
 
-# set permission just in case
-RUN chmod +x /app/bin/main
 
-CMD ["/app/bin/main", "-p 12345", "-V 5"]
+EXPOSE 4224
+
+ENTRYPOINT [ "/app/node/bin/main" ]
+CMD [ "-V 5" ]

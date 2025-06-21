@@ -12,7 +12,7 @@
 
 //! SUPPORT FOR IPV6 NOT YET ADDED
 typedef struct ip_addr{
-    int family;  // AF_INET or AF_INET6
+    int32_t family;  // AF_INET or AF_INET6
     union {
         uint32_t ipv4;
         uint16_t ipv6[8]; // can take both ipv4 and ipv6
@@ -24,6 +24,10 @@ typedef struct ip_addr{
 typedef struct dic_connection{
     int sockfd;
 
+    int queue_len;
+    pthread_cond_t queue_cond;
+    pthread_mutex_t queue_mut;
+    
     pthread_mutex_t recv_mut;
     pthread_mutex_t send_mut;
 

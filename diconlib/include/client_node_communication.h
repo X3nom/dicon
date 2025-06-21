@@ -26,6 +26,12 @@ typedef struct {
     dic_conn_t *device;
 } dic_rthread_t;
 
+/*======================================
+|          Connection                  |
+======================================*/
+
+// connects to node at the default port (4224)
+dic_node_t *dic_node_connect(ip_addr_t ip_address);
 
 /*==========================================
 |           MEMORY HANDLING                |

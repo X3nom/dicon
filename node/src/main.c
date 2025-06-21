@@ -1,6 +1,6 @@
 #include <node_client_communication.h>
+#include <node_main_communication.h>
 #include <global_logging.h>
-
 #include <unistd.h>
 #include <getopt.h>
 
@@ -47,15 +47,14 @@ int start_server(int port){
     return 0;
 }
 
-
-
 void show_help_and_exit(){
     printf("\
 == DICON NODE ==\n\
 options: \n\
-    -h        | show this menu and exit\n\
-    -p <port> | set port to listen at\n\
-    -V <int>  | set logging level, default 0\n\
+    -h              | show this menu and exit\n\
+    -s <password>   | run server password protected\n\
+    -m <ip_address> | set main-server ip address (optional)\n\
+    -V <int>        | set logging level, default 0\n\
 \n\
 exiting...\n");
     exit(0);
@@ -66,16 +65,22 @@ int main(int argc, char *argv[]){
 
     int opt;
 
-    int port = -1;
+    int port = 4224;
+    int main_server_port = 4225;
+    
+    bool main_server_specified = false;
+    ip_addr_t main_server_addr;
+    dic_conn_t *main_server_conn;
 
-    while ((opt = getopt(argc, argv, "hp:V:")) != -1) {
+    while ((opt = getopt(argc, argv, "hm:V:s:")) != -1) {
         switch (opt) {
             case 'h':
                 show_help_and_exit();
                 break;
-
-            case 'p':
-                port = atoi(optarg);
+            
+            case 'm':
+                main_server_specified = true;
+                main_server_addr = ipv4_from_str(optarg);
                 break;
 
             case 'V': // set logging level
@@ -86,8 +91,29 @@ int main(int argc, char *argv[]){
 
     if(port==-1) show_help_and_exit();
 
+    if(main_server_specified){
+        LOG(0, "Attempting connection to the main server");
+        // this connection should be held open for as long as this node is online
+        main_server_conn = dic_conn_new(main_server_addr, main_server_port);
+
+        while(main_server_conn->sockfd == -1){
+            LOG(0, "connection to the main server failed, attempting again in 1 second");
+            sleep(1);
+            dic_conn_tryconnect(main_server_conn);
+        }
+
+        int res = notify_main_server(main_server_conn);
+        if(res != 0){ LOG(0, "notify main server failed (code: %d)", res); }
+        else { LOG(1, "server notified successfully"); }
+    }
+
     LOG(0, "Starting server on port %d\n", port);
     start_server(port);
+
+
+    if(main_server_specified){
+        dic_conn_destroy(main_server_conn);
+    }
 
     return EXIT_SUCCESS;
 }

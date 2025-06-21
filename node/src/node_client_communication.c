@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include "../include/node_client_communication.h"
 #include <global_logging.h>
 #include <dlfcn.h>
@@ -128,6 +130,24 @@ msg_builder_ret handle_so_unload(dic_req_so_unload *req_body){
     return RESP_BUILD_RET;
 }
 
+msg_builder_ret handle_so_upload(dic_req_so_upload *req_body){
+    RESP_BUILDER_INIT(dic_resp_so_upload);
+    RESP_SET_HEAD();
+
+    char *path; 
+    asprintf(&path, "user_objects/%s.so", req_body->_name_null_file);
+
+    FILE *so_file = fopen(path, "wb");
+
+    uint8_t *file_bytes = req_body->_name_null_file + req_body->name_len + 1;
+    
+    fwrite(file_bytes, 1, req_body->file_size, so_file);
+    fclose(so_file);
+
+    return RESP_BUILD_RET;
+}
+
+
 
 msg_builder_ret handle_func_load(dic_req_func_load *req_body){
     RESP_BUILDER_INIT(dic_resp_func_load);
@@ -206,6 +226,7 @@ int dic_node_recv_send(dic_conn_t *conn){
 
         ccase(DIC_SO_LOAD, handle_so_load);
         ccase(DIC_SO_UNLOAD, handle_so_unload);
+        ccase(DIC_SO_UPLOAD, handle_so_upload);
 
         ccase(DIC_FUNC_LOAD, handle_func_load);
 

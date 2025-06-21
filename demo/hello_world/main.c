@@ -19,10 +19,10 @@ char *hello_dicon(void*x){
 
 
 int main(){
-    // get ip address of node
+    // get ip address of nodes
     ip_addr_t ip = ipv4_from_str("127.0.0.0");
     // connect to node
-    dic_conn_t *conn = dic_conn_new(ip, 12345);
+    dic_conn_t *conn = dic_node_connect(ip);
     if(conn==NULL || conn->sockfd == -1){
         perror("Connection failed!");
         exit(EXIT_FAILURE);

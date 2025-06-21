@@ -38,9 +38,10 @@ typedef struct atomic_send_recv_ret {
 
 
 
-/*-----------------------------------------
-|            MEM HANDLING                 |
--------------------------------------------*/
+dic_node_t *dic_node_connect(ip_addr_t ip_address){
+    return dic_conn_new(ip_address, DIC_NODE_PORT);
+}
+
 
 
 /*==========================================
@@ -316,6 +317,50 @@ int dic_so_unload(dic_rso_handle_t handle){
     atomic_send_recv_ret rcv = dic_atomic_send_recv(handle.device, msg);
 
     dic_resp_so_unload *body = (dic_resp_so_unload*)rcv.body;
+
+    int succ = body->success;
+
+    free(rcv.body);
+    free(msg.msg);
+
+    return succ;
+}
+
+/*==========================================
+|               SO_UPLOAD                  |
+============================================*/
+
+msg_builder_ret build_so_upload(dic_node_t *device, const char *so_path, const char *remote_name){
+
+    int name_len = strlen(remote_name);
+    
+    FILE *so_file = fopen(so_path, "rb");
+
+    fseek(so_file, 0, SEEK_END);
+    long file_size = ftell(so_file);
+    rewind(so_file);
+
+    REQ_BUILDER_INIT_DYNAMIC(dic_req_so_upload, name_len+1 + file_size);
+    REQ_BUILDER_SET_HEAD(DIC_SO_UPLOAD);
+
+    body->name_len = name_len;
+    body->file_size = file_size;
+    strcpy((char*)&body->_name_null_file, remote_name);
+    body->_name_null_file[name_len] = '\0';
+
+    uint8_t *file_buffer = &body->_name_null_file[name_len + 1];
+    fread(file_buffer, 1, file_size, so_file); // read file into the body
+    fclose(so_file);
+
+    return REQ_BUILDER_RET;
+}
+
+int dic_so_upload(dic_node_t *device, const char *so_path, const char *remote_name){
+    msg_builder_ret msg = build_so_upload(device, so_path, remote_name);
+
+    atomic_send_recv_ret rcv = dic_atomic_send_recv(device, msg);
+
+    dic_resp_so_upload *body = (dic_resp_so_upload*)rcv.body;
 
     int succ = body->success;
 

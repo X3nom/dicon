@@ -78,8 +78,13 @@ linked_list_node_info *handle_push_info(dic_conn_t *conn, dic_main_server_req_he
 
 
     dic_main_server_resp_head_generic resp_head;
-    resp_head.body_size = 0;
+    dic_resp_announce_info resp_body;
+
+    resp_body.error = 0;
+    resp_head.body_size = sizeof(resp_body);
+
     dic_conn_send(conn, (void*)&resp_head, sizeof(resp_head));
+    dic_conn_send(conn, (void*)&resp_body, resp_head.body_size);
 
     return append_info(&NODES_INFO, info);
 }
@@ -90,33 +95,33 @@ void handle_get_info(dic_conn_t *conn, dic_main_server_req_head_generic head){
 
     if(curr_node != NULL){
         len++;
-        for(len=0; curr_node->next != NULL; len++) curr_node = curr_node->next;
+        for(;curr_node->next != NULL; len++) curr_node = curr_node->next;
     }
 
-    dic_resp_get_info *body = malloc(sizeof(dic_resp_get_info) + sizeof(dic_node_info_t) * len);
+    LOG(2, "node_count: %d\n", len);
+
+    dic_resp_get_info *res_body = malloc(sizeof(dic_resp_get_info) + sizeof(dic_node_info_t) * len);
 
 
     curr_node = NODES_INFO;
 
-    body->count = len;
+    res_body->count = len;
     for(int i=0; i<len; i++){
-        body->nodes[i] = curr_node->info;
+        res_body->nodes[i] = curr_node->info;
         curr_node = curr_node->next;
     }
     
-
     dic_main_server_resp_head_generic resp_head;
-    resp_head.body_size = 0;
-
-
+    resp_head.body_size = sizeof(dic_resp_get_info) + sizeof(dic_node_info_t) * len;
 
     dic_conn_send(conn, (void*)&resp_head, sizeof(resp_head));
+    dic_conn_send(conn, (void*)res_body, resp_head.body_size);
 
 }
 
 
 void *connection_handler_thread(connection_handler_args *args){
-    LOG(2, "in connection handler thread");
+    LOG(2, "in connection handler thread\n");
     dic_conn_t *client_conn = args->conn;
 
     linked_list_node_info *conn_info = NULL;
@@ -133,18 +138,20 @@ void *connection_handler_thread(connection_handler_args *args){
 
         switch(head.operation){
             case DIC_ANNOUNCE_INFO:{
-                LOG(2, "recieved ANNOUNCE_INFO");
+                LOG(2, "recieved ANNOUNCE_INFO\n");
                 MUTEX_BLOCK(&NODES_INFO_MUT,
                     conn_info = handle_push_info(client_conn, head);
                     is_compute_node = true;
                 )
+                LOG(2, "ANNOUNCE_INFO - DONE\n");
                 break;
             }
             case DIC_GET_INFO:{
-                LOG(2, "recieved GET_INFO");
+                LOG(2, "recieved GET_INFO\n");
                 MUTEX_BLOCK(&NODES_INFO_MUT,
                     handle_get_info(client_conn, head);
                 )
+                LOG(2, "GET_INFO - DONE\n");
                 break;
             }
         }
@@ -156,6 +163,8 @@ void *connection_handler_thread(connection_handler_args *args){
     }
 
     dic_conn_destroy(client_conn); // free the conn
+
+    return NULL;
 }
 
 
@@ -168,7 +177,8 @@ void listen_loop(dic_listen_conn_t *listen_conn){
         connection_handler_args *args = malloc(sizeof(connection_handler_args));
         args->conn = client_conn;
 
-        pthread_t thread = pthread_create(NULL, NULL, (void*)connection_handler_thread, (void*)args);
+        pthread_t thread;
+        pthread_create(&thread, NULL, (void*)connection_handler_thread, (void*)args);
         pthread_detach(thread);
     }   
 }

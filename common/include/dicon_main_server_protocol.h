@@ -32,26 +32,26 @@ typedef struct ALIGNMENT {
 // OPERATIONS ==============
 
 
-typedef struct {
+typedef struct ALIGNMENT {
     uint32_t core_count;
 } dic_req_announce_info;
 
 
-typedef struct {
+typedef struct ALIGNMENT {
     uint32_t error;
 } dic_resp_announce_info;
 
 
-typedef struct {
+typedef struct ALIGNMENT {
 } dic_req_get_info;
 
 
-typedef struct {
+typedef struct ALIGNMENT {
     ip_addr_t address;
     uint32_t core_count;
 } dic_node_info_t;
 
-typedef struct {
+typedef struct ALIGNMENT {
     uint32_t count;
     dic_node_info_t nodes[];
 } dic_resp_get_info;

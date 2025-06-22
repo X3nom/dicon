@@ -111,6 +111,10 @@ msg_builder_ret handle_so_load(dic_req_so_load *req_body){
 
 
     void *handle = dlopen(so_path, RTLD_LAZY);
+    
+    if(handle == NULL){
+        LOG(1, "requested dlopen failed, handle is NULL (path: %s)\n", so_path);
+    }
 
     free(so_path);
 

@@ -37,6 +37,7 @@ uint64_t *find_primes(struct find_primes_args* args){
 
     for (unsigned int i = start; i <= end; i++) {
         if(is_prime(i)) {
+            printf("found prime: %d\n", i);
             *count += 1;
             if(*count >= allocated_len){
                 allocated_len += 16;
@@ -60,65 +61,82 @@ uint64_t *find_primes(struct find_primes_args* args){
 
 
 #define RANGE_START 1
-#define RANGE_END 10000000
+#define RANGE_END UINT32_MAX
 // #define CHUNK_SIZE 10000
-
-dic_conn_t **init_connections(dic_node_info_t *ips, int count){
-    dic_conn_t **connections = malloc(sizeof(dic_conn_t*)*count); 
-    for(int i=0; i<count; i++){
-        connections[i] = dic_node_connect(ips[i].address);
-    }
-    return connections;
-}
 
 
 int main() {
     // SETUP ===========================================================
-    dic_main_t *main_server = dic_main_connect(IPV4("172.0.0.1"));
-    dic_nodes_info_t *nodes = dic_get_nodes_info(main_server);
+    dic_main_t *main_server = dic_main_connect(IPV4("127.0.0.1"));
+
+    dic_nodes_info_t *nodes_info = dic_get_nodes_info(main_server);
+    printf("found %d nodes!\n", nodes_info->count);
+
     dic_conn_destroy(main_server);
 
+    for(int i=0; i<nodes_info->count; i++){
+        printf("  %d -> cores: %d\n", i, nodes_info->nodes[i].core_count);
+    }
+
     // initiate all connections
-    dic_conn_t **conns = init_connections(nodes->nodes, nodes->count); 
+    dic_conn_t **nodes = dic_nodes_connect_all(nodes_info); 
+
+
 
     // load SO on all devices
-    dic_rso_handle_t *so_handles = malloc(sizeof(dic_rso_handle_t)*nodes->count);
-    for(int i=0; i<nodes->count; i++)
-        so_handles[i] = dic_so_load(conns[i], "find-primes");
+    dic_rso_handle_t *so_handles = malloc(sizeof(dic_rso_handle_t)*nodes_info->count);
+    for(int i=0; i<nodes_info->count; i++){
+        #define REMOTE_NAME "find-primes"
+        so_handles[i] = dic_so_load(nodes[i], REMOTE_NAME);
+
+        if(so_handles[i].ptr == 0){ // handle is NULL, upload the .so
+            // upload the so
+            dic_so_upload(nodes[i], "./find-primes.so" ,REMOTE_NAME);
+
+            // try to load the so again (this time shouldn't fail)
+            so_handles[i] = dic_so_load(nodes[i], REMOTE_NAME);
+        }
+    }
+
+
 
     // load function pointers on all devices
-    dic_rfunc_ptr_t *func_ptrs = malloc(sizeof(dic_rfunc_ptr_t)*nodes->count);
-    for(int i=0; i<nodes->count; i++)
+    dic_rfunc_ptr_t *func_ptrs = malloc(sizeof(dic_rfunc_ptr_t)*nodes_info->count);
+    for(int i=0; i<nodes_info->count; i++)
         func_ptrs[i] = dic_func_load(so_handles[i], STR(find_primes));
+
+
 
     // ==================================================================
 
     int CHUNK_SIZE = 100000;
     int current_offset = 1;
 
-    int range_size = (RANGE_END - RANGE_START) / nodes->count;
+    int range_size = (RANGE_END - RANGE_START) / nodes_info->count;
     int primes_total = 0;
 
     // array for holding remote thread IDs
-    dic_rthread_t *rthreads = malloc(sizeof(dic_rthread_t)*nodes->count);
+    dic_rthread_t *rthreads = malloc(sizeof(dic_rthread_t)*nodes_info->count);
+
 
     // Assign work
-    for (int i = 0; i < nodes->count; i++) {
+    for (int i = 0; i < nodes_info->count; i++) {
         int start = RANGE_START + i * range_size;
-        int end = (i == nodes->count - 1) ? RANGE_END : start + range_size - 1;
+        int end = (i == nodes_info->count - 1) ? RANGE_END : start + range_size - 1;
 
         struct find_primes_args args;
         args.range_start = start;
         args.range_end = end;
 
-        dic_rvoid_ptr_t r_args = dic_rmalloc(conns[i], sizeof(args));
+        dic_rvoid_ptr_t r_args = dic_rmalloc(nodes[i], sizeof(args));
         dic_memcpy(&args, r_args, sizeof(args), LOCAL_2_REMOTE);
 
         rthreads[i] = dic_rthread_run(func_ptrs[i], r_args);
     }
 
+
     // Collect results
-    for (int i = 0; i < nodes->count; i++) {
+    for (int i = 0; i < nodes_info->count; i++) {
         dic_rvoid_ptr_t ret = dic_rthread_join(rthreads[i]);
 
         uint64_t arr_size;
@@ -127,24 +145,27 @@ int main() {
         uint64_t *arr = malloc(sizeof(uint64_t)*arr_size);
         dic_memcpy(arr, (dic_rvoid_ptr_t){ret.ptr+sizeof(uint64_t), ret.device}, arr_size*sizeof(uint64_t), REMOTE_2_LOCAL);
 
-        // print results
-        for(int j=0; j<arr_size; j++){
-            // printf("found: %lu\n", arr[j]);
-        }
-        primes_total += arr_size;
 
         printf("Found %lu primes on node %d\n", arr_size, i);
 
+        // print results
+        for(int j=0; j<arr_size; j++){
+            printf("   - found: %lu\n", arr[j]);
+        }
+        primes_total += arr_size;
+
+        // free the remote memory
         dic_rfree(ret);
+        // and also local memory
         free(arr);
     }
 
     printf("Total primes found: %d\n", primes_total);
 
 
-    for(int i=0; i<nodes->count; i++){
+    for(int i=0; i<nodes_info->count; i++){
         dic_so_unload(so_handles[i]);
-        dic_conn_destroy(conns[i]);
+        dic_conn_destroy(nodes[i]);
     }
 
     return 0;

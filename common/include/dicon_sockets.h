@@ -19,6 +19,7 @@ typedef struct ip_addr{
     } addr;
 } ip_addr_t;
 
+
 #define NONE_IP_ADDR ((ip_addr_t){-1, {0}})
 
 typedef struct dic_connection{

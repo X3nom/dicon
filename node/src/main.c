@@ -92,19 +92,19 @@ int main(int argc, char *argv[]){
     if(port==-1) show_help_and_exit();
 
     if(main_server_specified){
-        LOG(0, "Attempting connection to the main server");
+        LOG(0, "Attempting connection to the main server\n");
         // this connection should be held open for as long as this node is online
         main_server_conn = dic_conn_new(main_server_addr, main_server_port);
 
         while(main_server_conn->sockfd == -1){
-            LOG(0, "connection to the main server failed, attempting again in 1 second");
+            LOG(0, "connection to the main server failed, attempting again in 1 second\n");
             sleep(1);
             dic_conn_tryconnect(main_server_conn);
         }
 
         int res = notify_main_server(main_server_conn);
-        if(res != 0){ LOG(0, "notify main server failed (code: %d)", res); }
-        else { LOG(1, "server notified successfully"); }
+        if(res != 0){ LOG(0, "notify main server failed (code: %d)\n", res); }
+        else { LOG(1, "server notified successfully\n"); }
     }
 
     LOG(0, "Starting server on port %d\n", port);

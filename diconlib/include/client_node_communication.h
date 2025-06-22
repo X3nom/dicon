@@ -63,6 +63,8 @@ dic_rso_handle_t dic_so_load(dic_node_t *device, const char *name);
 
 int dic_so_unload(dic_rso_handle_t handle);
 
+int dic_so_upload(dic_node_t *device, const char *so_path, const char *remote_name);
+
 /*==========================================
 |            FUNCTION HANDLING             |
 ============================================*/

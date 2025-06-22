@@ -227,6 +227,8 @@ dic_conn_t *dic_conn_accept(dic_listen_conn_t *listen_conn){
 
     conn->sockfd = client_fd;
     conn->port = client_addr.sin_port;
+
+    conn->ip.family = client_addr.sin_family;
     conn->ip.addr.ipv4 = client_addr.sin_addr.s_addr;
 
     pthread_mutex_init(&conn->recv_mut, NULL);

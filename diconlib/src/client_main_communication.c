@@ -1,5 +1,6 @@
 #include <client_main_communication.h>
 #include <dicon_main_server_protocol.h>
+#include <client_node_communication.h>
 
 
 
@@ -25,4 +26,15 @@ dic_nodes_info_t *dic_get_nodes_info(dic_main_t *main_server_connection){
     dic_conn_recv(main_server_connection, (char*)res_body, res_head.body_size, 0);
 
     return res_body;
+}
+
+dic_node_t **dic_nodes_connect_all(dic_nodes_info_t *nodes_info){
+    dic_node_t **nodes = malloc(sizeof(dic_node_t*) * nodes_info->count);
+
+    for(int i=0; i<nodes_info->count; i++){
+        dic_node_t *node = dic_node_connect(nodes_info->nodes[i].address);
+        nodes[i] = node;
+    }
+
+    return nodes;
 }

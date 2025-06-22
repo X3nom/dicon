@@ -61,7 +61,7 @@ uint64_t *find_primes(struct find_primes_args* args){
 
 
 #define RANGE_START 1
-#define RANGE_END UINT32_MAX
+#define RANGE_END 10000000
 // #define CHUNK_SIZE 10000
 
 
@@ -86,16 +86,16 @@ int main() {
     // load SO on all devices
     dic_rso_handle_t *so_handles = malloc(sizeof(dic_rso_handle_t)*nodes_info->count);
     for(int i=0; i<nodes_info->count; i++){
-        #define REMOTE_NAME "find-primes"
+        #define REMOTE_NAME "find-primes_"
+        // so_handles[i] = dic_so_load(nodes[i], REMOTE_NAME);
+
+        // if(so_handles[i].ptr == 0){ // handle is NULL, upload the .so
+        // upload the so
+        dic_so_upload(nodes[i], "./find-primes.so" , REMOTE_NAME);
+
+        // try to load the so again (this time shouldn't fail)
         so_handles[i] = dic_so_load(nodes[i], REMOTE_NAME);
-
-        if(so_handles[i].ptr == 0){ // handle is NULL, upload the .so
-            // upload the so
-            dic_so_upload(nodes[i], "./find-primes.so" ,REMOTE_NAME);
-
-            // try to load the so again (this time shouldn't fail)
-            so_handles[i] = dic_so_load(nodes[i], REMOTE_NAME);
-        }
+        // }
     }
 
 
@@ -109,34 +109,42 @@ int main() {
 
     // ==================================================================
 
-    int CHUNK_SIZE = 100000;
-    int current_offset = 1;
+    int total_cores_count = 0;
+    for(int i=0; i<nodes_info->count; i++){
+        total_cores_count += nodes_info->nodes[i].core_count;
+    }
 
-    int range_size = (RANGE_END - RANGE_START) / nodes_info->count;
+    int range_size = (RANGE_END - RANGE_START) / total_cores_count;
     int primes_total = 0;
 
     // array for holding remote thread IDs
-    dic_rthread_t *rthreads = malloc(sizeof(dic_rthread_t)*nodes_info->count);
+    dic_rthread_t *rthreads = malloc(sizeof(dic_rthread_t)*total_cores_count);
 
 
     // Assign work
-    for (int i = 0; i < nodes_info->count; i++) {
-        int start = RANGE_START + i * range_size;
-        int end = (i == nodes_info->count - 1) ? RANGE_END : start + range_size - 1;
+    int thread_i = 0;
+    for (int node_i=0; node_i < nodes_info->count; node_i++) {
+        for(int core_i=0; core_i < nodes_info->nodes[node_i].core_count; core_i++){
 
-        struct find_primes_args args;
-        args.range_start = start;
-        args.range_end = end;
+            int start = RANGE_START + thread_i * range_size;
+            int end = (thread_i == total_cores_count - 1) ? RANGE_END : start + range_size - 1;
 
-        dic_rvoid_ptr_t r_args = dic_rmalloc(nodes[i], sizeof(args));
-        dic_memcpy(&args, r_args, sizeof(args), LOCAL_2_REMOTE);
+            struct find_primes_args args;
+            args.range_start = start;
+            args.range_end = end;
 
-        rthreads[i] = dic_rthread_run(func_ptrs[i], r_args);
+            dic_rvoid_ptr_t r_args = dic_rmalloc(nodes[node_i], sizeof(args));
+            dic_memcpy(&args, r_args, sizeof(args), LOCAL_2_REMOTE);
+
+            rthreads[thread_i] = dic_rthread_run(func_ptrs[node_i], r_args);
+            
+            thread_i++;
+        }
     }
 
 
     // Collect results
-    for (int i = 0; i < nodes_info->count; i++) {
+    for (int i = 0; i < total_cores_count; i++) {
         dic_rvoid_ptr_t ret = dic_rthread_join(rthreads[i]);
 
         uint64_t arr_size;

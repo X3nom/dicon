@@ -143,11 +143,13 @@ msg_builder_ret handle_so_upload(dic_req_so_upload *req_body){
     asprintf(&path, "user_objects/%s.so", req_body->_name_null_file);
 
     FILE *so_file = fopen(path, "wb");
+    int fd = fileno(so_file);
 
     uint8_t *file_bytes = req_body->_name_null_file + req_body->name_len + 1;
     
     fwrite(file_bytes, 1, req_body->file_size, so_file);
     fclose(so_file);
+    fsync(fd);
 
     return RESP_BUILD_RET;
 }

@@ -65,7 +65,7 @@ uint64_t *find_primes(struct find_primes_args* args){
 // #define CHUNK_SIZE 10000
 
 #define LOCAL_SO_PATH "./find-primes.so"
-#define REMOTE_NAME "find-primes_"
+#define REMOTE_NAME "find_primes"
 
 
 

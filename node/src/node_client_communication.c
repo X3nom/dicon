@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 
-#include "../include/node_client_communication.h"
+#include <../include/node_client_communication.h>
+#include <so_operations.h>
 #include <global_logging.h>
 #include <dlfcn.h>
 
@@ -147,6 +148,19 @@ msg_builder_ret handle_so_upload(dic_req_so_upload *req_body){
     
     fwrite(file_bytes, 1, req_body->file_size, so_file);
     fclose(so_file);
+
+    return RESP_BUILD_RET;
+}
+
+msg_builder_ret handle_so_verify(dic_req_so_verify *req_body){
+    RESP_BUILDER_INIT(dic_resp_so_verify);
+    RESP_SET_HEAD();
+
+    char *path;
+    asprintf(&path, "user_objects/%s.so", req_body->so_name);
+
+    dic_checksum_t checksum = dic_checksum(path);
+    resp_body->checksum = checksum;
 
     return RESP_BUILD_RET;
 }

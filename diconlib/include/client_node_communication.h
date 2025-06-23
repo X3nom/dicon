@@ -57,7 +57,7 @@ int dic_memcpy(void *local, dic_rvoid_ptr_t remote, int size, enum DIC_MEMCPY_MO
 
 typedef dic_rvoid_ptr_t dic_rso_handle_t;
 
-int dic_verify(dic_node_t *device, const char *name);
+dic_checksum_t dic_so_verify(dic_node_t *device, const char *name);
 
 dic_rso_handle_t dic_so_load(dic_node_t *device, const char *name);
 

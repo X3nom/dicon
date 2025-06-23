@@ -370,6 +370,37 @@ int dic_so_upload(dic_node_t *device, const char *so_path, const char *remote_na
     return succ;
 }
 
+/*==========================================
+|               SO VERIFY                   |
+============================================*/
+
+msg_builder_ret build_so_verify(dic_node_t *device, const char *name){
+    int name_len = strlen(name) + 1;
+    REQ_BUILDER_INIT_DYNAMIC(dic_req_so_verify, name_len);
+    REQ_BUILDER_SET_HEAD(DIC_SO_LOAD);
+
+    body->so_len = name_len;
+    strcpy(body->so_name, name);
+
+    return REQ_BUILDER_RET;
+}
+
+dic_checksum_t dic_so_verify(dic_node_t *device, const char *name){
+    msg_builder_ret msg = build_so_load(device, name);
+
+    atomic_send_recv_ret rcv = dic_atomic_send_recv(device, msg);
+
+    dic_resp_so_verify *body = (dic_resp_so_verify*)rcv.body;
+
+    dic_checksum_t checksum = body->checksum;
+
+    free(rcv.body);
+    free(msg.msg);
+
+    return checksum;
+}
+
+
 
 /*------------------------------------------
 |            FUNCTION HANDLING             |

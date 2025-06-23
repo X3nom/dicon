@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall \
 	-I../../diconlib/include -I../../common/include \
 	-L../../diconlib/lib -ldiconlib \
-	-lm
+	-lm -g
 
 
 SRC = main.c

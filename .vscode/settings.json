@@ -45,6 +45,9 @@
         "cstdlib": "c",
         "pthread.h": "c",
         "getopt.h": "c",
-        "client_main_communication.h": "c"
+        "client_main_communication.h": "c",
+        "compare": "c",
+        "cstdint": "c",
+        "so_operations.h": "c"
     }
 }

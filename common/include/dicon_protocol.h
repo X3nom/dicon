@@ -10,6 +10,7 @@
 
 #pragma once
 #include <inttypes.h>
+#include <so_operations.h>
 
 #define DIC_NODE_PORT 4224
 
@@ -38,7 +39,7 @@ enum DIC_OPERATION {
     // memcpy NODE -> CLIENT
     DIC_MEMCPY_N2C,
     
-    DIC_VERIFY,
+    DIC_SO_VERIFY,
     DIC_SO_LOAD,
     DIC_SO_UNLOAD,
     DIC_SO_UPLOAD,
@@ -145,13 +146,14 @@ typedef struct ALIGNMENT dic_resp_memcpy_n2c {
 
 // VERIFY ==================================
 
-typedef struct ALIGNMENT dic_req_verify {
-    uint8_t hash[64]; // bcrypt hash of password
-} dic_req_verify;
+typedef struct ALIGNMENT dic_req_so_verify {
+    uint32_t so_len;
+    char so_name[];
+} dic_req_so_verify;
 
-typedef struct ALIGNMENT dic_resp_verify {
-    int32_t success; // if unsuccessfull, connection should be dropped
-} dic_resp_verify;
+typedef struct ALIGNMENT dic_resp_so_verify {
+    dic_checksum_t checksum; // if unsuccessfull, connection should be dropped
+} dic_resp_so_verify;
 
 // SO_LOAD ==================================
 

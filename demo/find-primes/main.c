@@ -64,6 +64,10 @@ uint64_t *find_primes(struct find_primes_args* args){
 #define RANGE_END 10000000
 // #define CHUNK_SIZE 10000
 
+#define LOCAL_SO_PATH "./find-primes.so"
+#define REMOTE_NAME "find-primes_"
+
+
 
 int main() {
     // SETUP ===========================================================
@@ -81,17 +85,24 @@ int main() {
     // initiate all connections
     dic_conn_t **nodes = dic_nodes_connect_all(nodes_info); 
 
-
+    dic_checksum_t local_so_checksum = dic_checksum(LOCAL_SO_PATH);
+    printf("local checksum: %lu\n", local_so_checksum);
 
     // load SO on all devices
     dic_rso_handle_t *so_handles = malloc(sizeof(dic_rso_handle_t)*nodes_info->count);
     for(int i=0; i<nodes_info->count; i++){
-        #define REMOTE_NAME "find-primes_"
         // so_handles[i] = dic_so_load(nodes[i], REMOTE_NAME);
 
         // if(so_handles[i].ptr == 0){ // handle is NULL, upload the .so
         // upload the so
-        dic_so_upload(nodes[i], "./find-primes.so" , REMOTE_NAME);
+        dic_checksum_t node_so_checksum = dic_so_verify(nodes[i], REMOTE_NAME);
+
+        printf("%lu == %lu\n", local_so_checksum, node_so_checksum);
+        if(node_so_checksum != local_so_checksum){
+            // different versions of SO, sync
+            dic_so_upload(nodes[i], LOCAL_SO_PATH , REMOTE_NAME);
+        }
+
 
         // try to load the so again (this time shouldn't fail)
         so_handles[i] = dic_so_load(nodes[i], REMOTE_NAME);
